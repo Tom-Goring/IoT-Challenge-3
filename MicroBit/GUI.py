@@ -3,7 +3,7 @@ import datetime as dt
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib
-from tkinter import ttk, BOTH
+from tkinter import ttk, CENTER, SUNKEN, RAISED
 from bluezero import microbit
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -30,6 +30,11 @@ x, y, z, t = [], [], [], []  # lists to hold accelerometer data
 f = Figure(figsize=(5,4), dpi=100)
 a = f.add_subplot(111)
 
+plt.xticks(rotation=45, ha='right')
+plt.subplots_adjust(bottom=0.30)
+plt.title('MicroBit Accelerometer Readings')
+plt.ylabel('Acceleration (g)')
+
 
 def update_button_states():
     global buttonA_pressed
@@ -38,19 +43,23 @@ def update_button_states():
         buttonA_pressed = ubit.button_a
         buttonB_pressed = ubit.button_b
         # print(buttonA_pressed, buttonB_pressed)
-        time.sleep(0.2)
+
+
+def get_accelerometer_readings():
+    while True:
+        _x, _y, _z = ubit.accelerometer
+        x.append(_x)
+        y.append(_y)
+        z.append(_z)
+        t.append(dt.datetime.now())
 
 
 threading.Thread(target=update_button_states).start()
+threading.Thread(target=get_accelerometer_readings).start()  # we get the accelerometer readings in a thread due to it
+                                                             # being a large bottleneck in the speed of the program
 
 
 def animate(i, x, y, z, t):
-    _x, _y, _z = ubit.accelerometer
-    x.append(_x)
-    y.append(_y)
-    z.append(_z)
-    t.append(dt.datetime.now())
-
     x = x[-50:]
     y = y[-50:]
     z = z[-50:]
@@ -60,11 +69,6 @@ def animate(i, x, y, z, t):
     a.plot(t, x)
     a.plot(t, y)
     a.plot(t, z)
-
-    plt.xticks(rotation=45, ha='right')
-    plt.subplots_adjust(bottom=0.30)
-    plt.title('MicroBit Accelerometer Readings')
-    plt.ylabel('Acceleration (g)')
 
 
 LARGE_FONT = ("Verdana", 12)
@@ -103,14 +107,34 @@ class StartPage(tk.Frame):
         label = ttk.Label(self, text="This is the start page", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
-        canvas = tk.Canvas(self)
+        canvas = tk.Canvas(self, width=400, height=175)
+
         buttonA = canvas.create_oval(20, 20, 120, 120,
-                                          fill="red")
+                                     fill="red")
         buttonB = canvas.create_oval(275, 20, 375, 120,
-                                          fill="red")
-        canvas.pack()
+                                     fill="red")
+        canvas.pack(anchor=CENTER)
 
         threading.Thread(target=lambda: display_button_state(canvas, buttonA, buttonB)).start()
+
+        button_grid = tk.Frame(self)
+        grid = {}
+        pixels = ubit.pixels
+        for i in range(5):
+            pixels[i] = "{0:5b}".format(pixels[i])
+        for x in range(5):
+            for y in range(5):
+                btn = tk.Button(button_grid, command=lambda row=x, column=y: handle_pixel_grid(grid, row, column))
+                btn.config(relief=RAISED)
+                btn.grid(column=x, row=y)
+                if pixels[y][x] == "1":
+                    btn.configure(background="red")
+                    btn.config(relief='sunken')
+                grid[x, y] = btn
+
+        threading.Thread(target=lambda: update_microbit_display(grid)).start()
+
+        button_grid.pack()
 
         button1 = ttk.Button(self, text="Graph Page",
                              command=lambda: controller.show_frame(AccelerometerPage))
@@ -133,6 +157,39 @@ def display_button_state(canvas, buttonA, buttonB):
         else:
             change_colour(canvas=canvas, object=buttonB, colour="red")
             time.sleep(0.01)
+
+
+def handle_pixel_grid(grid, row, column):
+    if grid[row, column].config('relief')[-1] == 'sunken':
+        grid[row, column].config(relief=RAISED)
+        grid[row, column].configure(background="#d9d9d9")
+    else:
+        grid[row, column].config(relief=SUNKEN)
+        grid[row, column].configure(background="red")
+
+
+def update_microbit_display(button_grid):
+    while True:
+        pixel_grid = []
+        current_grid_on_mb = ubit.pixels
+        for y in range(5):
+            string = ""
+            for x in range(5):
+                if button_grid[x, y].cget("background") == "red":
+                    string += "1"
+                else:
+                    string += "0"
+            pixel_grid.append(string)
+
+        for i in range(5):
+            pixel_grid[i] = int(pixel_grid[i], 2)
+
+        inter = set(pixel_grid).intersection(current_grid_on_mb)
+        if len(inter) is not 0:
+            start = time.time()
+            ubit.pixels = pixel_grid
+            end = time.time()
+            print(end - start)
 
 
 class AccelerometerPage(tk.Frame):
