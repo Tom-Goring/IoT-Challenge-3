@@ -3,10 +3,12 @@ import datetime as dt
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib
-from tkinter import ttk
+from tkinter import ttk, BOTH
 from bluezero import microbit
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
+import threading
+import time
 
 from matplotlib import style
 matplotlib.use("TkAgg")
@@ -23,9 +25,23 @@ ubit = microbit.Microbit(adapter_addr='B0:35:9F:CF:A7:CD',
 
 ubit.connect()
 
+buttonA_pressed, buttonB_pressed = False, False
 x, y, z, t = [], [], [], []  # lists to hold accelerometer data
 f = Figure(figsize=(5,4), dpi=100)
 a = f.add_subplot(111)
+
+
+def update_button_states():
+    global buttonA_pressed
+    global buttonB_pressed
+    while True:
+        buttonA_pressed = ubit.button_a
+        buttonB_pressed = ubit.button_b
+        # print(buttonA_pressed, buttonB_pressed)
+        time.sleep(0.2)
+
+
+threading.Thread(target=update_button_states).start()
 
 
 def animate(i, x, y, z, t):
@@ -68,7 +84,7 @@ class Challenge3(tk.Tk):
 
         self.frames = {}
 
-        for F in (StartPage, PageOne, PageTwo, PageThree):
+        for F in (StartPage, AccelerometerPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -87,55 +103,42 @@ class StartPage(tk.Frame):
         label = ttk.Label(self, text="This is the start page", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
-        button = ttk.Button(self, text="Visit Page 1",
-                            command=lambda: controller.show_frame(PageOne))
-        button.pack()
+        canvas = tk.Canvas(self)
+        buttonA = canvas.create_oval(20, 20, 120, 120,
+                                          fill="red")
+        buttonB = canvas.create_oval(275, 20, 375, 120,
+                                          fill="red")
+        canvas.pack()
 
-        button2 = ttk.Button(self, text="Visit Page 2",
-                             command=lambda: controller.show_frame(PageTwo))
-        button2.pack()
+        threading.Thread(target=lambda: display_button_state(canvas, buttonA, buttonB)).start()
 
-        button3 = ttk.Button(self, text="Graph Page",
-                             command=lambda: controller.show_frame(PageThree))
-        button3.pack()
-
-
-class PageOne(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-
-        label = ttk.Label(self, text="Page One", font=LARGE_FONT)
-        label.pack(pady=10, padx=10)
-
-        button1 = ttk.Button(self, text="Back to home",
-                            command=lambda: controller.show_frame(StartPage))
+        button1 = ttk.Button(self, text="Graph Page",
+                             command=lambda: controller.show_frame(AccelerometerPage))
         button1.pack()
 
-        button2 = ttk.Button(self, text="Page Two",
-                            command=lambda: controller.show_frame(PageTwo))
-        button2.pack()
+
+def change_colour(canvas=None, object=None, colour=None):
+    canvas.itemconfig(object, fill=colour)
 
 
-class PageTwo(tk.Frame):
+def display_button_state(canvas, buttonA, buttonB):
+    while True:
+        if ubit.button_a != 0:
+            change_colour(canvas=canvas, object=buttonA, colour="green")
+        else:
+            change_colour(canvas=canvas, object=buttonA, colour="red")
+
+        if ubit.button_b != 0:
+            change_colour(canvas=canvas, object=buttonB, colour="green")
+        else:
+            change_colour(canvas=canvas, object=buttonB, colour="red")
+            time.sleep(0.01)
+
+
+class AccelerometerPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-
-        label = tk.Label(self, text="Page Two!!!", font=LARGE_FONT)
-        label.pack(pady=10,padx=10)
-
-        button1 = tk.Button(self, text="Back to Home",
-                            command=lambda: controller.show_frame(StartPage))
-        button1.pack()
-
-        button2 = tk.Button(self, text="Page One",
-                            command=lambda: controller.show_frame(PageOne))
-        button2.pack()
-
-
-class PageThree(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        label = tk.Label(self, text="Graph Page", font=LARGE_FONT)
+        label = tk.Label(self, text="MicroBit Accelerometer Readings", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
         button1 = ttk.Button(self, text="Back to home",
