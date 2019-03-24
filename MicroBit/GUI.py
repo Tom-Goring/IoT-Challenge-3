@@ -40,18 +40,22 @@ def update_button_states():
     global buttonA_pressed
     global buttonB_pressed
     while True:
+        print("Retrieving button data")
         buttonA_pressed = ubit.button_a
         buttonB_pressed = ubit.button_b
         # print(buttonA_pressed, buttonB_pressed)
+        time.sleep(1)
 
 
 def get_accelerometer_readings():
     while True:
+        print("Retrieving accel data")
         _x, _y, _z = ubit.accelerometer
         x.append(_x)
         y.append(_y)
         z.append(_z)
         t.append(dt.datetime.now())
+        time.sleep(0.5)
 
 
 threading.Thread(target=update_button_states).start()
@@ -147,16 +151,16 @@ def change_colour(canvas=None, object=None, colour=None):
 
 def display_button_state(canvas, buttonA, buttonB):
     while True:
-        if ubit.button_a != 0:
+        if buttonA_pressed != 0:
             change_colour(canvas=canvas, object=buttonA, colour="green")
         else:
             change_colour(canvas=canvas, object=buttonA, colour="red")
 
-        if ubit.button_b != 0:
+        if buttonB_pressed != 0:
             change_colour(canvas=canvas, object=buttonB, colour="green")
         else:
             change_colour(canvas=canvas, object=buttonB, colour="red")
-            time.sleep(0.01)
+        time.sleep(1)
 
 
 def handle_pixel_grid(grid, row, column):
@@ -171,6 +175,7 @@ def handle_pixel_grid(grid, row, column):
 def update_microbit_display(button_grid):
     while True:
         pixel_grid = []
+        print("Retrieving pixel data")
         current_grid_on_mb = ubit.pixels
         for y in range(5):
             string = ""
@@ -187,9 +192,11 @@ def update_microbit_display(button_grid):
         inter = set(pixel_grid).intersection(current_grid_on_mb)
         if len(inter) is not 0:
             start = time.time()
+            print("Sending pixel data")
             ubit.pixels = pixel_grid
             end = time.time()
             print(end - start)
+        time.sleep(1)
 
 
 class AccelerometerPage(tk.Frame):
