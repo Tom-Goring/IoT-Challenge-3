@@ -34,7 +34,7 @@ a = f.add_subplot(111)
 
 plt.xticks(rotation=45, ha='right')
 plt.subplots_adjust(bottom=0.30)
-plt.title('MicroBit Accelerometer Readings')
+plt.title('Desktop BLE Client Accelerometer Readings')
 plt.ylabel('Acceleration (g)')
 
 
@@ -91,7 +91,7 @@ class Challenge3(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
-        tk.Tk.wm_title(self, "MicroBit Linux Client")
+        tk.Tk.wm_title(self, "Desktop BLE Client Linux Client")
 
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
@@ -234,7 +234,7 @@ def update_microbit_display(button_grid):
 class AccelerometerPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        label = tk.Label(self, text="MicroBit Accelerometer Readings", font=LARGE_FONT)
+        label = tk.Label(self, text="Desktop BLE Client Accelerometer Readings", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
         button1 = ttk.Button(self, text="Back to home",
