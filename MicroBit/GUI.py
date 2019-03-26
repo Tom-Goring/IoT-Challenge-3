@@ -27,6 +27,8 @@ ubit.connect()
 
 buttonA_pressed, buttonB_pressed = False, False
 x, y, z, t = [], [], [], []  # lists to hold accelerometer data
+temp = None
+update_screen_flag = True
 f = Figure(figsize=(5,4), dpi=100)
 a = f.add_subplot(111)
 
@@ -36,11 +38,17 @@ plt.title('MicroBit Accelerometer Readings')
 plt.ylabel('Acceleration (g)')
 
 
+def get_temperature_readings():
+    global temp
+    while True:
+        temp = ubit.temperature
+        time.sleep(5)
+
 def update_button_states():
     global buttonA_pressed
     global buttonB_pressed
     while True:
-        print("Retrieving button data")
+        #print("Retrieving button data")
         buttonA_pressed = ubit.button_a
         buttonB_pressed = ubit.button_b
         # print(buttonA_pressed, buttonB_pressed)
@@ -49,7 +57,7 @@ def update_button_states():
 
 def get_accelerometer_readings():
     while True:
-        print("Retrieving accel data")
+        #print("Retrieving accel data")
         _x, _y, _z = ubit.accelerometer
         x.append(_x)
         y.append(_y)
@@ -59,8 +67,8 @@ def get_accelerometer_readings():
 
 
 threading.Thread(target=update_button_states).start()
-threading.Thread(target=get_accelerometer_readings).start()  # we get the accelerometer readings in a thread due to it
-                                                             # being a large bottleneck in the speed of the program
+threading.Thread(target=get_accelerometer_readings).start()  # we get the accel & temp readings in a thread due to it
+threading.Thread(target=get_temperature_readings).start()    # being a large bottleneck in the speed of the program
 
 
 def animate(i, x, y, z, t):
@@ -111,15 +119,15 @@ class StartPage(tk.Frame):
         label = ttk.Label(self, text="This is the start page", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
-        canvas = tk.Canvas(self, width=400, height=175)
+        self.canvas = tk.Canvas(self, width=400, height=175)
 
-        buttonA = canvas.create_oval(20, 20, 120, 120,
+        self.buttonA = self.canvas.create_oval(20, 20, 120, 120,
                                      fill="red")
-        buttonB = canvas.create_oval(275, 20, 375, 120,
+        self.buttonB = self.canvas.create_oval(275, 20, 375, 120,
                                      fill="red")
-        canvas.pack(anchor=CENTER)
+        self.canvas.pack(anchor=CENTER)
 
-        threading.Thread(target=lambda: display_button_state(canvas, buttonA, buttonB)).start()
+        threading.Thread(target=lambda: self.display_button_state()).start()
 
         button_grid = tk.Frame(self)
         grid = {}
@@ -140,27 +148,53 @@ class StartPage(tk.Frame):
 
         button_grid.pack()
 
+        self.temperature = ttk.Label(self, text=ubit.temperature, font=LARGE_FONT)
+        self.temperature.pack()
+
+        threading.Thread(target=lambda: self.update_temp_reading()).start()
+
         button1 = ttk.Button(self, text="Graph Page",
                              command=lambda: controller.show_frame(AccelerometerPage))
         button1.pack()
 
+        self.entry = tk.Entry(self, text="Message")
+        self.entry.pack()
+
+        button2 = ttk.Button(self, text="Send Message",
+                             command=self.send_message)
+
+        button2.pack()
+
+    def send_message(self):
+        update_screen_flag = False
+        string = self.entry.get()
+        ubit.text = string
+        time.sleep(5)
+        update_screen_flag = True
+
+    def display_button_state(self):
+        while True:
+            if buttonA_pressed != 0:
+                change_colour(canvas=self.canvas, object=self.buttonA, colour="green")
+            else:
+                change_colour(canvas=self.canvas, object=self.buttonA, colour="red")
+
+            if buttonB_pressed != 0:
+                change_colour(canvas=self.canvas, object=self.buttonB, colour="green")
+            else:
+                change_colour(canvas=self.canvas, object=self.buttonB, colour="red")
+            time.sleep(1)
+
+    def update_temp_reading(self):
+        while True:
+            string = str(temp) + " degrees C"
+            self.temperature.configure(text=string)
+            print(temp)
+            time.sleep(1)
+
 
 def change_colour(canvas=None, object=None, colour=None):
     canvas.itemconfig(object, fill=colour)
-
-
-def display_button_state(canvas, buttonA, buttonB):
-    while True:
-        if buttonA_pressed != 0:
-            change_colour(canvas=canvas, object=buttonA, colour="green")
-        else:
-            change_colour(canvas=canvas, object=buttonA, colour="red")
-
-        if buttonB_pressed != 0:
-            change_colour(canvas=canvas, object=buttonB, colour="green")
-        else:
-            change_colour(canvas=canvas, object=buttonB, colour="red")
-        time.sleep(1)
 
 
 def handle_pixel_grid(grid, row, column):
@@ -174,28 +208,26 @@ def handle_pixel_grid(grid, row, column):
 
 def update_microbit_display(button_grid):
     while True:
-        pixel_grid = []
-        print("Retrieving pixel data")
-        current_grid_on_mb = ubit.pixels
-        for y in range(5):
-            string = ""
-            for x in range(5):
-                if button_grid[x, y].cget("background") == "red":
-                    string += "1"
-                else:
-                    string += "0"
-            pixel_grid.append(string)
+        if update_screen_flag:
+            pixel_grid = []
+            #print("Retrieving pixel data")
+            current_grid_on_mb = ubit.pixels
+            for y in range(5):
+                string = ""
+                for x in range(5):
+                    if button_grid[x, y].cget("background") == "red":
+                        string += "1"
+                    else:
+                        string += "0"
+                pixel_grid.append(string)
 
-        for i in range(5):
-            pixel_grid[i] = int(pixel_grid[i], 2)
+            for i in range(5):
+                pixel_grid[i] = int(pixel_grid[i], 2)
 
-        inter = set(pixel_grid).intersection(current_grid_on_mb)
-        if len(inter) is not 0:
-            start = time.time()
-            print("Sending pixel data")
-            ubit.pixels = pixel_grid
-            end = time.time()
-            print(end - start)
+            inter = set(pixel_grid).intersection(current_grid_on_mb)
+            if len(inter) is not 0:
+                #print("Sending pixel data")
+                ubit.pixels = pixel_grid
         time.sleep(1)
 
 
